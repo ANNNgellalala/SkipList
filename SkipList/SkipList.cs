@@ -14,12 +14,19 @@ public class SkipList<TKey, TValue>
         Count = 0;
         Probability = probability;
         _head = new SkipListNode(MaxLevel);
-        ValidLevel = 0;
+        for (var i = 0;
+             i < MaxLevel;
+             i++)
+        {
+            _head.NextNodes[i] = _end!;
+        }
+
+        Level = 0;
     }
 
     public int MaxLevel { get; init; }
 
-    public int ValidLevel { get; set; }
+    public int Level { get; set; }
 
     public int Count { get; internal set; }
 
@@ -33,18 +40,18 @@ public class SkipList<TKey, TValue>
 
     private int GetRandomLevel()
     {
-        var level = 0;
+        var level = 1;
         while (_random.NextDouble() > Probability)
             level++;
 
-        return level;
+        return Math.Min(level, MaxLevel);
     }
 
     public bool Contains(
         TKey key)
     {
         var cur = _head;
-        for (var i = ValidLevel - 1;
+        for (var i = Level - 1;
              i >= 0;
              i--)
         {
@@ -59,7 +66,7 @@ public class SkipList<TKey, TValue>
         TKey key)
     {
         var cur = _head;
-        for (var i = ValidLevel - 1;
+        for (var i = Level - 1;
              i >= 0;
              i--)
         {
@@ -79,7 +86,7 @@ public class SkipList<TKey, TValue>
         TKey key)
     {
         var cur = _head;
-        for (var i = ValidLevel - 1;
+        for (var i = Level - 1;
              i >= 0;
              i--)
         {
@@ -95,7 +102,7 @@ public class SkipList<TKey, TValue>
         TValue value)
     {
         if (Contains(key))
-            return;
+            ThrowHelper.ThrowInsertWithExitedKeyException(key);
 
         var level = GetRandomLevel();
         var newNode = new SkipListNode(level, key, value);
@@ -111,7 +118,8 @@ public class SkipList<TKey, TValue>
             cur.NextNodes[i] = newNode;
         }
 
-        ValidLevel = Math.Max(ValidLevel, level);
+        Level = Math.Max(Level, level);
+        Count++;
     }
 
     public void Update(
@@ -119,7 +127,7 @@ public class SkipList<TKey, TValue>
         TValue newValue)
     {
         var cur = _head;
-        for (var i = ValidLevel - 1;
+        for (var i = Level - 1;
              i >= 0;
              i--)
         {
@@ -137,8 +145,8 @@ public class SkipList<TKey, TValue>
         TKey key)
     {
         var cur = _head;
-        var previousNodesOfDeleteNode = new SkipListNode[ValidLevel];
-        for (var i = ValidLevel - 1;
+        var previousNodesOfDeleteNode = new SkipListNode[Level];
+        for (var i = Level - 1;
              i >= 0;
              i--)
         {
@@ -148,7 +156,7 @@ public class SkipList<TKey, TValue>
             previousNodesOfDeleteNode[i] = cur;
         }
 
-        for (var i = ValidLevel - 1;
+        for (var i = Level - 1;
              i >= 0;
              i--)
         {
@@ -156,14 +164,14 @@ public class SkipList<TKey, TValue>
                 previousNodesOfDeleteNode[i].NextNodes[i] = previousNodesOfDeleteNode[i].NextNodes[i].NextNodes[i];
 
             if (previousNodesOfDeleteNode[i] == _head && previousNodesOfDeleteNode[i].NextNodes[i] == _end)
-                ValidLevel = i;
+                Level = i;
         }
     }
 
     public TValue this[
         TKey key] { get => Select(key); set => Update(key, value); }
 
-    internal class SkipListNode
+    public class SkipListNode
     {
         public SkipListNode(
             int level,

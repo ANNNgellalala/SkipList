@@ -11,4 +11,15 @@ internal static class ThrowHelper
     {
         throw new System.InvalidOperationException();
     }
+
+    internal static void ThrowInsertWithExitedKeyException<TKey>(
+        TKey key)
+    {
+        throw new System.InvalidOperationException($"key:{key} has existed");
+    }
+
+    internal static void ThrowRandomLevelIsZeroException()
+    {
+        throw new InvalidOperationException("level is 0");
+    }
 }
