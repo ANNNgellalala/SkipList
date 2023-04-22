@@ -59,7 +59,7 @@ public class SkipList<TKey, TValue>
                 cur = cur.NextNodes[i];
         }
 
-        return key.CompareTo(cur.Key) == 0;
+        return cur != _head && key.CompareTo(cur.Key) == 0;
     }
 
     public TValue Select(
