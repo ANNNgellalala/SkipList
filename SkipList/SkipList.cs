@@ -1,18 +1,21 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 
 namespace SkipList;
 
-public class SkipList<TKey, TValue>
+public class SkipList<TKey, TValue> : IDictionary<TKey, TValue>
     where TKey : IComparable<TKey>
 {
     public SkipList(
         int maxLevel,
-        double probability)
+        double probability,
+        bool isReadOnly)
     {
         _random = new Random();
         MaxLevel = maxLevel;
         Count = 0;
         Probability = probability;
+        IsReadOnly = isReadOnly;
         _head = new SkipListNode(MaxLevel);
         for (var i = 0;
              i < MaxLevel;
@@ -22,15 +25,66 @@ public class SkipList<TKey, TValue>
         }
 
         Level = 0;
+        Keys = new List<TKey>();
+        Values = new List<TValue>();
     }
 
-    public int MaxLevel { get; init; }
+    public int MaxLevel { get; }
 
     public int Level { get; set; }
 
-    public int Count { get; internal set; }
+    public void Add(
+        KeyValuePair<TKey, TValue> item)
+    {
+        
+    }
 
-    public double Probability { get; init; }
+    public void Clear()
+    {
+        for (var i = 0;
+             i < Level;
+             i++)
+        {
+            _head.NextNodes[i] = _end!;
+        }
+        
+        Level = 0;
+    }
+
+    public bool Contains(
+        KeyValuePair<TKey, TValue> item)
+    {
+        return ContainsKey(item.Key);
+    }
+
+    public void CopyTo(
+        KeyValuePair<TKey, TValue>[] array,
+        int arrayIndex)
+    {
+        ArgumentNullException.ThrowIfNull(array, nameof(array));
+
+        if (arrayIndex + Count > array.Length)
+            throw new ArgumentOutOfRangeException(nameof(arrayIndex));
+
+        var cur = _head.NextNodes[0];
+        while (cur != _end)
+        {
+            array[arrayIndex++] = new KeyValuePair<TKey, TValue>(cur.Key, cur.Value);
+            cur = cur.NextNodes[0];
+        }
+    }
+
+    public bool Remove(
+        KeyValuePair<TKey, TValue> item)
+    {
+        return Remove(item.Key);
+    }
+
+    public int Count { get; private set; }
+
+    public bool IsReadOnly { get; }
+
+    private double Probability { get; }
 
     private readonly Random _random;
 
@@ -47,24 +101,11 @@ public class SkipList<TKey, TValue>
         return Math.Min(level, MaxLevel);
     }
 
-    public bool Contains(
+    private TValue Select(
         TKey key)
     {
-        var cur = _head;
-        for (var i = Level - 1;
-             i >= 0;
-             i--)
-        {
-            while (cur.NextNodes[i] != _end && key.CompareTo(cur.NextNodes[i].Key) >= 0)
-                cur = cur.NextNodes[i];
-        }
+        ArgumentNullException.ThrowIfNull(key, nameof(key));
 
-        return cur != _head && key.CompareTo(cur.Key) == 0;
-    }
-
-    public TValue Select(
-        TKey key)
-    {
         var cur = _head;
         for (var i = Level - 1;
              i >= 0;
@@ -75,15 +116,14 @@ public class SkipList<TKey, TValue>
         }
 
         if (key.CompareTo(cur.Key) != 0)
-        {
-            ThrowHelper.ThrowKeyNotFoundException();
-        }
+            throw new InvalidOperationException($"{key} not exist");
 
-        return cur.Value!;
+        return cur.Value;
     }
 
-    public TValue? SelectOrDefault(
-        TKey key)
+    public void Add(
+        TKey key,
+        TValue value)
     {
         var cur = _head;
         for (var i = Level - 1;
@@ -94,19 +134,15 @@ public class SkipList<TKey, TValue>
                 cur = cur.NextNodes[i];
         }
 
-        return key.CompareTo(cur.Key) == 0 ? cur.Value : default;
-    }
-
-    public void Insert(
-        TKey key,
-        TValue value)
-    {
-        if (Contains(key))
-            ThrowHelper.ThrowInsertWithExitedKeyException(key);
+        if (key.CompareTo(cur.Key) == 0)
+        {
+            cur.Value = value;
+            return;
+        }
 
         var level = GetRandomLevel();
         var newNode = new SkipListNode(level, key, value);
-        var cur = _head;
+        cur = _head;
         for (var i = level - 1;
              i >= 0;
              i--)
@@ -122,9 +158,8 @@ public class SkipList<TKey, TValue>
         Count++;
     }
 
-    public void Update(
-        TKey key,
-        TValue newValue)
+    public bool ContainsKey(
+        TKey key)
     {
         var cur = _head;
         for (var i = Level - 1;
@@ -135,17 +170,17 @@ public class SkipList<TKey, TValue>
                 cur = cur.NextNodes[i];
         }
 
-        if (key.CompareTo(cur.Key) != 0)
-            return;
-
-        cur.Value = newValue;
+        return cur != _head && key.CompareTo(cur.Key) == 0;
     }
 
-    public void Delete(
+    public bool Remove(
         TKey key)
     {
+        ArgumentNullException.ThrowIfNull(key, nameof(key));
+
         var cur = _head;
-        var previousNodesOfDeleteNode = new SkipListNode[Level];
+        var previousNodesOfDeletedNode = new List<SkipListNode>();
+        var indexes = new List<int>();
         for (var i = Level - 1;
              i >= 0;
              i--)
@@ -153,23 +188,56 @@ public class SkipList<TKey, TValue>
             while (cur.NextNodes[i] != _end && key.CompareTo(cur.NextNodes[i].Key) > 0)
                 cur = cur.NextNodes[i];
 
-            previousNodesOfDeleteNode[i] = cur;
+            if (key.CompareTo(cur.NextNodes[i].Key) != 0)
+                continue;
+
+            indexes.Add(i);
+            previousNodesOfDeletedNode.Add(cur);
         }
 
+        if (previousNodesOfDeletedNode.Count == 0)
+            return false;
+        
+        for (var i = 0;
+             i < previousNodesOfDeletedNode.Count;
+             i++)
+        {
+            var index = indexes[i];
+            previousNodesOfDeletedNode[i].NextNodes[index] = previousNodesOfDeletedNode[i].NextNodes[index].NextNodes[index];
+        }
+
+        return true;
+    }
+
+    public bool TryGetValue(
+        TKey key,
+        out TValue value)
+    {
+        var cur = _head;
         for (var i = Level - 1;
              i >= 0;
              i--)
         {
-            if (previousNodesOfDeleteNode[i].NextNodes[i] != _end && key.CompareTo(previousNodesOfDeleteNode[i].NextNodes[i].Key) == 0)
-                previousNodesOfDeleteNode[i].NextNodes[i] = previousNodesOfDeleteNode[i].NextNodes[i].NextNodes[i];
-
-            if (previousNodesOfDeleteNode[i] == _head && previousNodesOfDeleteNode[i].NextNodes[i] == _end)
-                Level = i;
+            while (cur.NextNodes[i] != _end && key.CompareTo(cur.NextNodes[i].Key) >= 0)
+                cur = cur.NextNodes[i];
         }
+
+        if (cur != _head && key.CompareTo(cur.Key) == 0)
+        {
+            value = cur.Value;
+            return true;
+        }
+
+        value = default;
+        return false;
     }
 
     public TValue this[
-        TKey key] { get => Select(key); set => Update(key, value); }
+        TKey key] { get => Select(key); set => Add(key, value); }
+
+    public ICollection<TKey> Keys { get; }
+
+    public ICollection<TValue> Values { get; }
 
     public class SkipListNode
     {
@@ -193,5 +261,15 @@ public class SkipList<TKey, TValue>
         public TValue Value { get; set; }
 
         public SkipListNode[] NextNodes { get; set; }
+    }
+
+    public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
+    {
+        throw new NotImplementedException();
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
     }
 }
