@@ -204,6 +204,21 @@ public class SkipList<TKey, TValue> : IDictionary<TKey, TValue>
             previousNodesOfDeletedNode[i].NextNodes[index] = previousNodesOfDeletedNode[i].NextNodes[index].NextNodes[index];
         }
 
+        Level = 0;
+        Count--;
+        if (Count == 0)
+            return true;
+
+        for (var i = Level - 1;
+             i >= 0;
+             i--)
+        {
+            if (_head.NextNodes[i] == _end)
+                continue;
+
+            Level = i + 1;
+            break;
+        }
         return true;
     }
 
