@@ -25,18 +25,16 @@ public class SkipList<TKey, TValue> : IDictionary<TKey, TValue>
         }
 
         Level = 0;
-        Keys = new List<TKey>();
-        Values = new List<TValue>();
     }
 
     public int MaxLevel { get; }
 
-    public int Level { get; set; }
+    public int Level { get; private set; }
 
     public void Add(
         KeyValuePair<TKey, TValue> item)
     {
-        
+        Add(item.Key, item.Value);
     }
 
     public void Clear()
@@ -235,9 +233,37 @@ public class SkipList<TKey, TValue> : IDictionary<TKey, TValue>
     public TValue this[
         TKey key] { get => Select(key); set => Add(key, value); }
 
-    public ICollection<TKey> Keys { get; }
+    public ICollection<TKey> Keys
+    {
+        get
+        {
+            var cur = _head.NextNodes[0];
+            var keys = new List<TKey>();
+            while (cur != _end)
+            {
+                keys.Add(cur.Key);
+                cur = cur.NextNodes[0];
+            }
 
-    public ICollection<TValue> Values { get; }
+            return keys;
+        }
+    }
+
+    public ICollection<TValue> Values
+    {
+        get
+        {
+            var cur = _head.NextNodes[0];
+            var values = new List<TValue>();
+            while (cur != _end)
+            {
+                values.Add(cur.Value);
+                cur = cur.NextNodes[0];
+            }
+
+            return values;
+        }
+    }
 
     public class SkipListNode
     {
@@ -265,7 +291,13 @@ public class SkipList<TKey, TValue> : IDictionary<TKey, TValue>
 
     public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
     {
-        throw new NotImplementedException();
+        var cur = _head.NextNodes[0];
+        while (cur != _end)
+        {
+            yield return new KeyValuePair<TKey, TValue>(cur.Key, cur.Value);
+
+            cur = cur.NextNodes[0];
+        }
     }
 
     IEnumerator IEnumerable.GetEnumerator()
